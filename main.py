@@ -146,24 +146,13 @@ def main() -> int:
         success = process_post(post, idx, len(posts))
         results.append(success)
 
-        if not success:
-            logger.warning(f"Continuing to next post after failure...\n")
-
         # Short break between posts
-        time.sleep(2)
+        time.sleep(1)
 
     # Final cleanup
     force_cleanup_notepad()
 
-    # Summary
-    logger.info("=" * 70)
-    logger.info("🏁 AUTOMATION COMPLETE")
-    logger.info("=" * 70)
-
     success_count = sum(results)
-    logger.info(f"✓ Successful: {success_count}/{len(posts)}")
-    logger.info(f"✗ Failed: {len(posts) - success_count}/{len(posts)}")
-    logger.info(f"📁 Output directory: {OUTPUT_DIR}")
 
     # List created files
     created_files = sorted(OUTPUT_DIR.glob("post_*.txt"))
