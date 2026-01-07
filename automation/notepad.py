@@ -1,7 +1,11 @@
 import time
 import os
 from pathlib import Path
+
+import pyautogui
 import pygetwindow as gw
+import pyperclip
+from automation.mouse_keyboard import hotkey, press
 from automation.mouse_keyboard import double_click, hotkey, press, type_text
 from utils.logger import get_logger
 import subprocess
@@ -26,7 +30,6 @@ def wait_for_notepad(timeout: float = 8.0) -> bool:
 
 
 def focus_notepad() -> bool:
-    # Get the most recently opened Notepad window
     wins = gw.getWindowsWithTitle('Notepad')
     if wins:
         try:
@@ -34,6 +37,17 @@ def focus_notepad() -> bool:
             if win.isMinimized:
                 win.restore()
             win.activate()
+            time.sleep(0.5)
+
+            # CRITICAL: Click inside the NOTEPAD WINDOW, not on the desktop icon.
+            # We click at the top-center of the window (the title bar area).
+            click_x = win.left + (win.width // 2)
+            click_y = win.top + 10
+            pyautogui.click(click_x, click_y)
+
+            # Move the mouse to a neutral corner so the hover effect disappears
+            pyautogui.moveTo(10, 10)
+
             return True
         except Exception as e:
             logger.warning(f"Could not focus Notepad: {e}")
@@ -41,23 +55,41 @@ def focus_notepad() -> bool:
 
 
 def type_post_content(title: str, body: str) -> None:
-    # Adding a small delay before typing to ensure focus is stable
-    time.sleep(0.5)
+    """Pastes content into Notepad instantly via the clipboard."""
+    focus_notepad()
+
+    # 1. Clear previous session content (Windows 11 fix)
+    hotkey("ctrl", "a")
+    time.sleep(0.1)
+    press("backspace")
+
+    # 2. Prepare the payload
     payload = f"Title: {title}\n\n{body}"
-    type_text(payload)
+
+    # 3. Copy to clipboard and paste
+    logger.info("Copying content to clipboard and pasting...")
+    pyperclip.copy(payload)
+    time.sleep(0.2)  # Small buffer for clipboard sync
+    hotkey("ctrl", "v")
+
+    # 4. Clear clipboard after (Security best practice)
+    pyperclip.copy("")
+    logger.info("✓ Content pasted successfully")
 
 
 def save_file(target_path: Path) -> None:
-    # Ensure the target directory is clean
     if target_path.exists():
         target_path.unlink()
 
-    hotkey("ctrl", "s")
+    hotkey("ctrl", "shift", "s")
     time.sleep(1.0)
 
-    # Type the ABSOLUTE path to avoid saving in the last used folder
-    type_text(str(target_path.absolute()))
-    time.sleep(0.5)
+    # Instead of typing the whole path, paste it!
+    full_path = str(target_path.absolute())
+    pyperclip.copy(full_path)
+    hotkey("ctrl", "v")
+
+    time.sleep(0.3)
     press("enter")
     time.sleep(1.0)
 

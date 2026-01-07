@@ -3,6 +3,8 @@ import time
 import traceback
 from pathlib import Path
 
+import pyautogui
+
 from automation.mouse_keyboard import win_show_desktop, park_mouse
 from automation.notepad import (
     close_notepad,
@@ -53,7 +55,7 @@ def process_post(post: dict, idx: int, total: int) -> bool:
         # STEP 2: Find icon
         logger.info("STEP 2: Locating Notepad icon...")
         screenshot = capture_desktop()
-        x, y, score = locate_notepad_icon(screenshot)
+        x, y, score = locate_notepad_icon(screenshot,iteration_idx=idx)
         logger.info(f"✓ Icon found at ({x}, {y}) - confidence: {score:.3f}")
 
         # STEP 3: Open Notepad
@@ -92,8 +94,9 @@ def process_post(post: dict, idx: int, total: int) -> bool:
         # STEP 7: Close Notepad
         logger.info("STEP 7: Closing Notepad...")
         close_notepad()
-        time.sleep(1.5)
-
+        time.sleep(0.5)
+        pyautogui.click(5, 5)
+        time.sleep(0.5)
         logger.info(f"✓✓✓ Post {post_id} completed successfully!")
         return True
 
