@@ -1,90 +1,47 @@
-from typing import Optional, Tuple
-
+import cv2
 import numpy as np
-import pyautogui
+from pathlib import Path
+from desktop.icon_detector import IconNotFoundError
 
-from desktop.icon_detector import IconNotFoundError, match_template_multiscale
-from desktop.screenshot import capture_desktop
-from utils.logger import get_logger
-from utils.retry import retry
-
-logger = get_logger("grounding")
-
-# Global cache of the Notepad template, captured once from the user's desktop.
-_NOTEPAD_TEMPLATE: Optional[np.ndarray] = None
-
-DEFAULT_SCALES = (0.9, 1.0, 1.1)
-DEFAULT_THRESHOLD = 0.75
-# Exclude taskbar (assume ~40px) and top strip (20px) from search
-DESKTOP_SEARCH_REGION = (0, 20, 1920, 1040)  # (x, y, w, h)
+# Path to your saved template in the assets folder
+TEMPLATE_PATH = Path(__file__).parent.parent /"artifacts" / "notepad_template.png"
+_CACHED_TEMPLATE = None
 
 
-def capture_template_from_cursor(box_size: int = 80) -> np.ndarray:
-    """
-    Capture a small square patch around the current mouse cursor.
-    The user should hover the cursor over the Notepad icon before this is called.
-    """
-    import time
-    
-    x, y = pyautogui.position()
-    half = box_size // 2
-    
-    # Get screen dimensions to ensure region stays within bounds
-    screen_width, screen_height = pyautogui.size()
-    
-    # Clamp the region to screen boundaries
-    left = max(0, x - half)
-    top = max(0, y - half)
-    right = min(screen_width, x + half)
-    bottom = min(screen_height, y + half)
-    
-    # Calculate actual width and height (may be smaller if near edges)
-    width = right - left
-    height = bottom - top
-    
-    # Ensure minimum size
-    if width < 40 or height < 40:
-        raise ValueError(
-            f"Cursor too close to screen edge. Please move cursor more to center. "
-            f"Current position: ({x}, {y}), Screen size: {screen_width}x{screen_height}"
-        )
-    
-    region = (left, top, width, height)
-    logger.info("Capturing template around cursor at (%s, %s) with region %s", x, y, region)
-    
-    # Small delay to ensure desktop is stable
-    time.sleep(0.2)
-    
-    return capture_desktop(region)
+def get_notepad_template():
+    """Loads and caches the template from disk."""
+    global _CACHED_TEMPLATE
+    if _CACHED_TEMPLATE is None:
+        if not TEMPLATE_PATH.exists():
+            raise FileNotFoundError(f"Missing template: {TEMPLATE_PATH}. Save an icon snippet here first.")
+
+        # Load in color (BGR)
+        _CACHED_TEMPLATE = cv2.imread(str(TEMPLATE_PATH))
+
+        if _CACHED_TEMPLATE is None:
+            raise ValueError(f"Failed to decode image at {TEMPLATE_PATH}. Check if the file is a valid PNG.")
+
+    return _CACHED_TEMPLATE
 
 
-def set_notepad_template(template_bgr: np.ndarray) -> None:
-    """
-    Store the captured Notepad template for later matching.
-    """
-    global _NOTEPAD_TEMPLATE
-    _NOTEPAD_TEMPLATE = template_bgr
-    logger.info("Notepad template initialized (shape=%s)", template_bgr.shape)
+def locate_notepad_icon(screenshot):
+    template = get_notepad_template()
+
+    # Convert both to grayscale to ignore highlight colors
+    gray_screenshot = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
+    gray_template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+
+    result = cv2.matchTemplate(gray_screenshot, gray_template, cv2.TM_CCOEFF_NORMED)
+    _, max_val, _, max_loc = cv2.minMaxLoc(result)
+
+    if max_val < 0.8:
+        raise IconNotFoundError(f"Icon not found. Confidence: {max_val:.2f}")
+
+    h, w = template.shape[:2]
+    return max_loc[0] + w // 2, max_loc[1] + h // 2, max_val
 
 
-@retry(attempts=3, delay_seconds=1.0, exceptions=(IconNotFoundError,))
-def locate_notepad_icon(
-    screenshot_bgr: np.ndarray,
-    scales=DEFAULT_SCALES,
-    threshold: float = DEFAULT_THRESHOLD,
-    search_region: Optional[Tuple[int, int, int, int]] = DESKTOP_SEARCH_REGION,
-) -> Tuple[int, int, float]:
-    """
-    Locate the Notepad icon and return (x, y, score) using the cached template.
-    Retries handled via decorator.
-    """
-    if _NOTEPAD_TEMPLATE is None:
-        raise RuntimeError("Notepad template has not been initialized.")
-
-    return match_template_multiscale(
-        screenshot_bgr,
-        _NOTEPAD_TEMPLATE,
-        scales=scales,
-        threshold=threshold,
-        search_region=search_region,
-    )
+def set_notepad_template(template):
+    """Optional: Allows updating the template in-memory if needed."""
+    global _CACHED_TEMPLATE
+    _CACHED_TEMPLATE = template

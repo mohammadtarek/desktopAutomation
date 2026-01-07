@@ -1,5 +1,4 @@
 import time
-from typing import Iterable
 
 import pyautogui
 
@@ -32,3 +31,9 @@ def press(key: str) -> None:
 def win_show_desktop() -> None:
     hotkey("win", "d")
     time.sleep(0.3)
+
+def park_mouse():
+    """Moves the mouse to a neutral corner to clear hovers/tooltips."""
+    screen_width, screen_height = pyautogui.size()
+    # Move to bottom right, but stay 10px away from the absolute corner to avoid FailSafe
+    pyautogui.moveTo(screen_width - 10, screen_height - 10, duration=0.2)
