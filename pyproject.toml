@@ -1,0 +1,22 @@
+[project]
+name = "desktop-vision-automation"
+version = "0.1.0"
+description = "Vision-based Windows desktop automation to ground and launch Notepad and save posts."
+readme = "README.md"
+requires-python = ">=3.9,<3.13"
+dependencies = [
+    "opencv-python>=4.10.0",
+    "numpy>=1.26.0",
+    "mss>=9.0.0",
+    "Pillow>=10.0.0",
+    "pyautogui>=0.9.54",
+    "pygetwindow>=0.0.9",
+    "requests>=2.32.0",
+    "typing-extensions>=4.9.0",
+]
+
+[tool.uv]
+package = true
+dev-dependencies = [
+    "pytest>=7.4.0",
+]
